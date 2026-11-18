@@ -73,7 +73,7 @@ Both go in the `.env` file. `.env` is listed in `.gitignore`, so your keys are n
 
 By default tailoring uses `claude-sonnet-5-5` and quick tasks such as ranking use `claude-haiku-5-5`. You can change either in `.env`. Each tailored resume and cover letter is a single request, usually costing a few cents. Check [current pricing](https://www.anthropic.com/pricing).
 
-### Adzuna keys (for job search, free)
+### Adzuna keys (for job search)
 
 1. Register at [developer.adzuna.com](https://developer.adzuna.com/).
 2. Your **Application ID** and **Application Key** are on the dashboard. Add them to `.env`:
@@ -81,6 +81,8 @@ By default tailoring uses `claude-sonnet-5-5` and quick tasks such as ranking us
    ADZUNA_APP_ID=...
    ADZUNA_APP_KEY=...
    ```
+
+New Adzuna accounts start on a small trial of test calls (25 at the time of writing). Ongoing use needs a paid Adzuna plan, and Adzuna shows prices in its dashboard. Each position you search uses one call, so search one or two positions at a time while on the trial.
 
 Restart the server after editing `.env`. If a key is missing, the Home page tells you which one.
 

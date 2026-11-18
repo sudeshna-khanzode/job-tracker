@@ -253,7 +253,7 @@ function setupCard() {
   return `<div class="card setup"><h2>Finish setting up</h2><p class="hint">Add these keys to the <code>.env</code> file in the project folder, then restart the server. The README has step-by-step instructions.</p>
     <ul class="setuplist">
       ${item(st.claude, "Claude API key: tailors your resume and cover letter", "Get a key at console.anthropic.com and set <code>ANTHROPIC_API_KEY</code>")}
-      ${item(st.jobs, "Adzuna keys: finds jobs (free)", "Register at developer.adzuna.com and set <code>ADZUNA_APP_ID</code> and <code>ADZUNA_APP_KEY</code>")}
+      ${item(st.jobs, "Adzuna keys: finds jobs", "Register at developer.adzuna.com and set <code>ADZUNA_APP_ID</code> and <code>ADZUNA_APP_KEY</code>")}
     </ul></div>`;
 }
 function viewHome() {
@@ -482,10 +482,10 @@ const claudeReady = () => !!(S.sample && S.status && S.status.claude);
 const jobsReady = () => !!(S.board && S.status && S.status.jobs);
 function boardErr(e) {
   switch (e && e.code) {
-    case "no_keys": return "Job search isn't set up yet. Add your free Adzuna app ID and key to the .env file, then restart the server (see README).";
+    case "no_keys": return "Job search isn't set up yet. Add your Adzuna app ID and key to the .env file, then restart the server (see README).";
     case "bad_keys": return "Adzuna rejected your app ID or key. Check ADZUNA_APP_ID and ADZUNA_APP_KEY in .env, then restart.";
     case "bad_country": return e.message;
-    case "rate_limited": return "Adzuna's rate limit was reached. Wait a minute and try again.";
+    case "rate_limited": return "Adzuna says you've used up your calls (the free trial includes only a few). Check your plan on developer.adzuna.com, or add jobs by hand on the Apply tab.";
     case "offline": return e.message;
     default: return "Job search failed. " + (e && e.message ? e.message : "Try again.");
   }
@@ -512,7 +512,7 @@ function viewFind() {
   <h1>Find new jobs</h1>
   <p class="sub">Searches job listings from many sites (through Adzuna) for your target roles, skips anything already in your tracker, and ranks the rest against your resume.</p>
   ${noResume ? `<div class="notice acc"><b>Add your resume first.</b> Matching and tailoring use it. <a href="#profile">Go to My profile →</a></div>` : ""}
-  ${!jobsReady() ? `<div class="notice warn"><b>Job search isn't set up yet.</b> Add your free Adzuna keys to <code>.env</code> and restart the server (steps in the README). Meanwhile you can add jobs by hand on the <a href="#apply">Apply</a> tab.</div>` : ""}
+  ${!jobsReady() ? `<div class="notice warn"><b>Job search isn't set up yet.</b> Add your Adzuna keys to <code>.env</code> and restart the server (steps in the README). Meanwhile you can add jobs by hand on the <a href="#apply">Apply</a> tab.</div>` : ""}
   <div class="card">
     <div class="row">
       <div style="flex:2"><label class="f">Positions (comma separated)</label><input type="text" data-pf="prefs.roles" value="${esc(pr.roles)}" placeholder="e.g. Data Analyst, Business Analyst"></div>

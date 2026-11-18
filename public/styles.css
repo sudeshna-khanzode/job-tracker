@@ -227,3 +227,17 @@ code{font:12px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:v
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
 .dot.ok{background:var(--good)}
 .dot.warn{background:var(--warn)}
+.aipanel{margin-top:14px;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 14px}
+.aihead{display:flex;align-items:center;gap:8px;position:relative}
+.aibtns{display:flex;gap:6px;flex-wrap:wrap}
+details.info{display:inline-block;position:relative;margin-left:auto}
+details.info summary{list-style:none;cursor:pointer;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font:italic 700 12px Georgia,serif;color:var(--accent-text);background:var(--accent-soft);user-select:none}
+details.info summary::-webkit-details-marker{display:none}
+details.info[open] summary{background:var(--accent);color:var(--accent-ink)}
+.infopop{position:absolute;right:0;top:26px;z-index:10;width:250px;background:var(--surface);border:1px solid var(--line-2);border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px rgba(40,36,90,.15);font-size:12.5px;color:var(--text-2);line-height:1.45}
+.infopop b{color:var(--text);display:block;margin-bottom:2px}
+.infopop a{display:inline-block;margin-top:6px;font-weight:600}
+.pastebox{border:1px solid var(--accent);box-shadow:0 0 0 3px var(--accent-soft);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.pastebox ol{margin:4px 0 10px;padding-left:18px;color:var(--text-2)}
+.pastebox ol li{margin-bottom:3px}
+.pastebox textarea{min-height:120px;font-size:12px}

@@ -8,7 +8,7 @@ Find jobs that suit you, get a resume and cover letter tailored to each one, and
 
 1. **My profile.** Upload your resumes (PDF, Word or text), add your skills and notes, and set the job titles and location to search for.
 2. **Find jobs.** Searches listings from many job sites (through [Adzuna](https://www.adzuna.com/)). Jobs already in your tracker are skipped, and the rest are ranked against your resume by Claude. You choose 10, 15, 20 or 25, then tick the ones you like.
-3. **Apply.** For each job, Claude writes a tailored resume and cover letter using **only facts from your resumes**. It also shows what you match, any gaps, and anything the ad asks for, such as a police check or selection criteria. You download Word (.docx) or PDF, apply on the job site, and when you come back it asks **"Did you apply?"**
+3. **Apply.** For each job, an AI writes a tailored resume and cover letter using **only facts from your resumes**. You can use your own free Claude, ChatGPT or Gemini account (copy and paste, no key needed) or add an API key for one-click tailoring. It also shows what you match, any gaps, and anything the ad asks for, such as a police check or selection criteria. You download Word (.docx) or PDF, apply on the job site, and when you come back it asks **"Did you apply?"**
 4. **Tracker.** A dashboard of every job: totals, applications per week, response rate and a table where you update the status (applied, got a response, interview, offer, rejected). Jobs with no reply after 2 weeks get a "Follow up?" tag. You can export everything to CSV.
 
 ![Tailoring a resume](docs/tailor.png)
@@ -58,11 +58,23 @@ npm start
 
 Open **http://localhost:3000** in your browser. To stop the server, press `Ctrl+C` in the terminal. Next time, just `cd job-tracker` and run `npm start` again. Your data is kept.
 
-## Getting your keys
+## Tailoring with your own AI (free, no keys)
 
-Both go in the `.env` file. `.env` is listed in `.gitignore`, so your keys are never committed.
+You don't need any key to get tailored documents. On a job, open **Tailor resume & letter**, then under **Tailor with your own AI** click **Claude**, **ChatGPT** or **Gemini**:
 
-### Claude API key (for tailoring and ranking)
+1. The app copies the request (your resume, the job description and the instructions) and opens that AI in a new tab.
+2. Paste it there (Cmd+V / Ctrl+V) and send. A free account works.
+3. Copy the AI's whole answer, paste it back into the app, and click **Create documents**.
+
+You get the same formatted resume and cover letter, with Word and PDF downloads. To ask for changes, type them in the box under the documents and click **Revise with …**.
+
+**Tip:** the **ⓘ** next to "Tailor with your own AI" links to the Claude-hosted version of this app, where tailoring is a single click. To point it at your own copy, change `CLAUDE_VERSION_URL` at the top of `public/js/app.js`, and share that artifact from Claude so others can open it.
+
+## Getting your keys (optional)
+
+Keys go in the `.env` file. `.env` is listed in `.gitignore`, so your keys are never committed. Without any keys you can still add jobs by hand, tailor with your own AI, and track everything.
+
+### Claude API key (optional: one-click tailoring and ranking)
 
 1. Go to [console.anthropic.com](https://console.anthropic.com/) and sign in.
 2. Add some credit under **Billing**. API usage is billed separately from a Claude.ai subscription.
@@ -86,7 +98,7 @@ New Adzuna accounts start on a small trial of test calls (25 at the time of writ
 
 Restart the server after editing `.env`. If a key is missing, the Home page tells you which one.
 
-**Without the keys:** the tracker still works. You can add jobs by hand ("Add a job from another site"), track statuses and export. Search needs Adzuna and tailoring needs Claude.
+**Without the keys:** everything still works except job search (needs Adzuna), one-click tailoring and match scores (need a Claude API key). You can add jobs by hand with "Add a job from another site" and tailor with your own AI for free.
 
 ## Tips
 

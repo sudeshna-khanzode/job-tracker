@@ -21,6 +21,14 @@ const HEARD_SET = new Set(["response", "interview", "offer", "rejected"]);
 const STATUS_PILL = { shortlisted: "", ready: "acc", applied: "acc", response: "warn", interview: "good", offer: "good", rejected: "bad", withdrawn: "", dismissed: "" };
 const COUNTRIES = [["AU","Australia"],["NZ","New Zealand"],["US","United States"],["GB","United Kingdom"],["CA","Canada"],["IN","India"],["SG","Singapore"],["ZA","South Africa"],["DE","Germany"],["NL","Netherlands"],["FR","France"],["IT","Italy"],["ES","Spain"],["AT","Austria"],["BE","Belgium"],["CH","Switzerland"],["PL","Poland"],["BR","Brazil"],["MX","Mexico"]];
 const JOBTYPES = [["","Any type"],["fulltime","Full-time"],["parttime","Part-time"],["contract","Contract"],["permanent","Permanent"]];
+// "Tailor with your own AI": copy the request, open the AI's site, paste the answer back.
+const AIS = [
+  { id: "claude", name: "Claude", url: "https://claude.ai/new" },
+  { id: "chatgpt", name: "ChatGPT", url: "https://chatgpt.com/" },
+  { id: "gemini", name: "Gemini", url: "https://gemini.google.com/app" },
+];
+// The Claude-hosted version of this app, where tailoring is one click. Change this to your own shared link.
+const CLAUDE_VERSION_URL = "https://claude.ai/artifact/FuFLXUCHz2ujWiepk6f9Cu";
 const ROUTES = ["home", "profile", "find", "apply", "tracker"];
 
 /* ============ state ============ */
@@ -248,11 +256,11 @@ function renderView() {
 function setupCard() {
   const st = S.status;
   if (!st) return `<div class="notice bad"><b>Can't reach the Job Tracker server.</b> Start it with <code>npm start</code> in the project folder, then reload this page.</div>`;
-  if (st.claude && st.jobs) return "";
+  if (st.jobs) return "";
   const item = (ok, title, how) => `<li class="${ok ? "ok" : ""}"><span class="tick">${ok ? "✓" : "!"}</span><div><b>${title}</b><div class="small muted">${ok ? "Connected" : how}</div></div></li>`;
-  return `<div class="card setup"><h2>Finish setting up</h2><p class="hint">Add these keys to the <code>.env</code> file in the project folder, then restart the server. The README has step-by-step instructions.</p>
+  return `<div class="card setup"><h2>Finish setting up</h2><p class="hint">Add keys to the <code>.env</code> file in the project folder, then restart the server. The README has step-by-step instructions. You can also skip this and add jobs by hand.</p>
     <ul class="setuplist">
-      ${item(st.claude, "Claude API key: tailors your resume and cover letter", "Get a key at console.anthropic.com and set <code>ANTHROPIC_API_KEY</code>")}
+      ${item(st.claude, "Claude API key (optional): one-click tailoring", "Not needed: you can tailor for free with your own Claude, ChatGPT or Gemini account. For one click, set <code>ANTHROPIC_API_KEY</code>")}
       ${item(st.jobs, "Adzuna keys: finds jobs", "Register at developer.adzuna.com and set <code>ADZUNA_APP_ID</code> and <code>ADZUNA_APP_KEY</code>")}
     </ul></div>`;
 }
@@ -681,7 +689,7 @@ function applyCard(j) {
 /* ---------- tailoring workspace ---------- */
 function openWs(key) {
   const j = S.jobs.get(key); if (!j) return;
-  S.ws = { key, busy: false, tab: "resume", err: "", base: "all", extra: "", revise: "", desc: j.description || "", descDirty: false, ctl: null };
+  S.ws = { key, busy: false, tab: "resume", err: "", base: "all", extra: "", revise: "", desc: j.description || "", descDirty: false, ctl: null, ai: "claude", paste: null, answer: "", pasteErr: "", prompt: "", copyFailed: false };
   renderWs();
   loadDocLibs().catch(() => {});
 }
@@ -689,6 +697,91 @@ function closeWs() {
   if (S.ws && S.ws.ctl) S.ws.ctl.abort();
   S.ws = null; $("#modal").hidden = true; $("#modal").innerHTML = "";
   scheduleRender();
+}
+const aiName = (id) => (AIS.find((a) => a.id === id) || AIS[0]).name;
+function aiPanel(W) {
+  return `
+    <div class="aipanel">
+      <div class="aihead"><b>Tailor with your own AI</b> <span class="pill good">Free</span>
+        <details class="info"><summary aria-label="About tailoring with Claude">i</summary>
+          <div class="infopop"><b>Have Claude?</b> In the Claude version of Job Tracker, tailoring is one click: no copying or pasting.
+            <a href="${esc(CLAUDE_VERSION_URL)}" target="_blank" rel="noopener">Open the Claude version ↗</a></div>
+        </details>
+      </div>
+      <p class="small muted" style="margin:2px 0 8px">Copies the request and opens the AI in a new tab. Paste it there, then copy the answer back here. Works with free accounts.</p>
+      <div class="aibtns">${AIS.map((a) => `<button class="btn sm ${W.ai === a.id && W.paste ? "pri" : ""}" data-act="aiCopy" data-ai="${a.id}">${a.name} ↗</button>`).join("")}</div>
+      ${!claudeReady() ? `<p class="small muted" style="margin:8px 0 0">For one-click tailoring here instead, add an Anthropic API key to <code>.env</code> (paid).</p>` : ""}
+    </div>`;
+}
+function pastePanel(W) {
+  const n = aiName(W.ai);
+  return `
+    <div class="pastebox">
+      <p class="step">${W.paste === "revise" ? "Revising" : "Tailoring"} with ${esc(n)}</p>
+      <ol class="small">
+        <li>The request is copied. ${W.copyFailed ? `<b>Your browser blocked copying</b>, so <a href="#" data-act="aiShowPrompt">show the request</a> and copy it yourself.` : `In the ${esc(n)} tab, paste it (Cmd+V / Ctrl+V) and send. <a href="#" data-act="aiCopyAgain">Copy again</a>`}</li>
+        <li>When ${esc(n)} finishes, copy its whole answer (use its copy button).</li>
+        <li>Paste the answer below and click <b>Create documents</b>.</li>
+      </ol>
+      <textarea id="aiAnswer" rows="7" placeholder="Paste ${esc(n)}'s answer here">${esc(W.answer || "")}</textarea>
+      ${W.pasteErr ? `<div class="notice bad small" style="margin:8px 0 0">${esc(W.pasteErr)}</div>` : ""}
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn pri" data-act="aiApply">Create documents</button>
+        <button class="btn ghost" data-act="aiCancel">Cancel</button>
+        <a class="btn ghost" href="${esc((AIS.find((a) => a.id === W.ai) || AIS[0]).url)}" target="_blank" rel="noopener">Open ${esc(n)} again ↗</a>
+      </div>
+    </div>`;
+}
+function aiPrompt(mode) {
+  const W = S.ws, j = S.jobs.get(W.key);
+  const base = mode === "revise" ? revisePrompt(j, W, j.tailored) : tailorPrompt(j, W);
+  return base + "\n\nIMPORTANT: Reply with ONLY the JSON object in a single code block. No explanation before or after it.";
+}
+async function aiCopy(ai, mode = "new") {
+  const W = S.ws; if (!W) return;
+  const j = S.jobs.get(W.key);
+  if (mode === "revise" && !(W.revise || "").trim()) { toast("Type what you'd like changed first."); return; }
+  if (mode === "revise" && !(j && j.tailored)) return;
+  if (W.descDirty) { const nj = clone(j); nj.description = W.desc; nj.descIsSnippet = false; saveJob(nj); W.descDirty = false; }
+  const text = aiPrompt(mode);
+  const target = (AIS.find((a) => a.id === ai) || AIS[0]).url;
+  // open the tab first, while the click still counts as the user's action
+  window.open(target, "_blank", "noopener");
+  W.ai = ai; W.paste = mode; W.prompt = text; W.pasteErr = ""; W.answer = ""; W.err = "";
+  try { await navigator.clipboard.writeText(text); W.copyFailed = false; toast(`Copied. Paste it into ${aiName(ai)}.`); }
+  catch { W.copyFailed = true; }
+  renderWs();
+}
+function aiApply() {
+  const W = S.ws; if (!W) return;
+  const raw = ($("#aiAnswer") && $("#aiAnswer").value) || W.answer || "";
+  W.answer = raw;
+  if (!raw.trim()) { W.pasteErr = "Paste the AI's answer first."; renderWs(); return; }
+  const out = parseJsonLoose(raw);
+  if (!out.ok || !out.value || !out.value.resume || !out.value.coverLetter) {
+    W.pasteErr = "Couldn't read that answer. Make sure you copied the whole reply (it starts with { and ends with }). If the answer was cut off, ask the AI to “continue”, or click its regenerate button, then copy it again.";
+    renderWs(); return;
+  }
+  const v = out.value, cur = S.jobs.get(W.key); if (!cur) return;
+  const nj = clone(cur);
+  nj.tailored = { resume: v.resume, coverLetter: v.coverLetter, fit: v.fit || {}, at: now(), base: W.base, via: W.ai };
+  if (nj.status === "shortlisted") { nj.status = "ready"; nj.history = (nj.history || []).concat([{ s: "ready", at: now() }]); }
+  if (v.fit && v.fit.score != null) nj.match = Object.assign({}, nj.match || {}, { score: Math.round(Number(v.fit.score) || 0), reason: String(v.fit.summary || (nj.match && nj.match.reason) || "").slice(0, 160) });
+  saveJob(nj);
+  if (W.paste === "revise") W.revise = "";
+  W.paste = null; W.answer = ""; W.pasteErr = ""; W.prompt = "";
+  toast("Documents created");
+  renderWs();
+}
+function parseJsonLoose(text) {
+  const t = String(text || "").trim(), tries = [t];
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i); if (fence) tries.push(fence[1].trim());
+  const a = t.indexOf("{"), b = t.lastIndexOf("}");
+  if (a >= 0 && b > a) tries.push(t.slice(a, b + 1));
+  for (const x of tries) { try { return { ok: true, value: JSON.parse(x) }; } catch {} }
+  // common copy damage: smart quotes from some chat UIs
+  for (const x of tries) { try { return { ok: true, value: JSON.parse(x.replace(/[“”]/g, '"')) }; } catch {} }
+  return { ok: false };
 }
 function renderWs() {
   const W = S.ws; if (!W) return;
@@ -711,15 +804,16 @@ function renderWs() {
         <select id="wsBase">${rs.length > 1 ? `<option value="all" ${W.base === "all" ? "selected" : ""}>All my resumes (pick the best of each)</option>` : ""}${rs.map((r) => `<option value="${esc(r.id)}" ${W.base === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}</select>
         <label class="f">Anything to emphasise? <span class="muted">(optional)</span></label>
         <input type="text" id="wsExtra" value="${esc(W.extra)}" placeholder="e.g. focus on my customer service; keep it to one page">`}
-        <div style="margin-top:12px;display:flex;gap:8px">
-          ${W.busy ? `<button class="btn" data-act="wsStop">Stop</button>` : `<button class="btn pri" data-act="wsGenerate" ${rs.length && claudeReady() ? "" : "disabled"}>${t ? "Regenerate" : "Generate resume + cover letter"}</button>`}
-        </div>
-        ${!claudeReady() ? `<div class="notice warn small" style="margin-top:10px">Tailoring needs your Anthropic API key. Add <code>ANTHROPIC_API_KEY</code> to <code>.env</code> and restart the server.</div>` : ""}
+        ${claudeReady() ? `<div style="margin-top:12px;display:flex;gap:8px">
+          ${W.busy ? `<button class="btn" data-act="wsStop">Stop</button>` : `<button class="btn pri" data-act="wsGenerate" ${rs.length ? "" : "disabled"}>${t ? "Regenerate" : "Generate resume + cover letter"}</button>`}
+        </div>` : ""}
+        ${rs.length ? aiPanel(W) : ""}
       </div>
       <div class="ws-right">
         ${W.err ? `<div class="notice bad">${esc(W.err)}</div>` : ""}
         ${W.busy ? `<div class="progress"><div class="spin"></div><span id="wsProg">${esc(W.prog || "Claude is reading the job and your resume…")}</span></div><p class="small muted">This usually takes 30–90 seconds. Only facts from your resumes are used.</p>` : ""}
-        ${!W.busy && !t ? `<div class="empty"><b>Your tailored documents will appear here</b>Check the job description on the left, then click Generate.</div>` : ""}
+        ${W.paste ? pastePanel(W) : ""}
+        ${!W.busy && !t && !W.paste ? `<div class="empty"><b>Your tailored documents will appear here</b>Check the job description on the left, then ${claudeReady() ? "click Generate, or " : ""}pick an AI under “Tailor with your own AI”.</div>` : ""}
         ${!W.busy && t ? wsResult(j) : ""}
       </div>
     </div>
@@ -768,7 +862,7 @@ function wsResult(j) {
     <div class="paper">${paper}</div>
     <div class="row" style="margin-top:12px">
       <input type="text" id="wsRevise" value="${esc(W.revise)}" placeholder="Ask for changes, e.g. shorten the cover letter, mention my Excel skills more">
-      <button class="btn shrink" data-act="wsRevise" ${claudeReady() ? "" : "disabled"}>Revise</button>
+      ${claudeReady() ? `<button class="btn shrink" data-act="wsRevise">Revise</button>` : `<button class="btn shrink" data-act="aiRevise" data-tip="Copies your change request for ${esc(aiName(W.ai))}. Paste the answer back here.">Revise with ${esc(aiName(W.ai))}</button>`}
     </div>`;
 }
 
@@ -1090,6 +1184,16 @@ const ACT = {
   closeWs: () => closeWs(),
   closeModal: () => { if (S.ws) closeWs(); else { $("#modal").hidden = true; $("#modal").innerHTML = ""; } },
   wsGenerate: () => wsRun("new"),
+  aiCopy: (b) => aiCopy(b.dataset.ai, "new"),
+  aiRevise: () => aiCopy((S.ws && S.ws.ai) || "claude", "revise"),
+  aiCopyAgain: async () => { const W = S.ws; if (!W || !W.prompt) return; try { await navigator.clipboard.writeText(W.prompt); toast("Copied again"); } catch { W.copyFailed = true; renderWs(); } },
+  aiApply: () => aiApply(),
+  aiCancel: () => { const W = S.ws; if (!W) return; W.paste = null; W.answer = ""; W.pasteErr = ""; renderWs(); },
+  aiShowPrompt: () => {
+    const W = S.ws; if (!W || !W.prompt) return;
+    ask(`<h3>Copy this request</h3><p class="small muted" style="margin:0 0 8px">Select all of it (click inside, then Cmd+A / Ctrl+A), copy it, and paste it into ${esc(aiName(W.ai))}.</p>
+      <textarea readonly style="min-height:260px;font-size:12px">${esc(W.prompt)}</textarea>`, [{ label: "Done", cls: "pri" }]);
+  },
   wsRevise: () => wsRun("revise"),
   wsStop: () => S.ws && S.ws.ctl && S.ws.ctl.abort(),
   wsTab: (b) => { S.ws.tab = b.dataset.tab; renderWs(); },
@@ -1146,6 +1250,7 @@ document.addEventListener("input", (e) => {
   if (t.id === "wsDesc" && S.ws) { S.ws.desc = t.value; S.ws.descDirty = true; }
   else if (t.id === "wsExtra" && S.ws) S.ws.extra = t.value;
   else if (t.id === "wsRevise" && S.ws) S.ws.revise = t.value;
+  else if (t.id === "aiAnswer" && S.ws) { S.ws.answer = t.value; }
   else if (t.id === "tq") { S.tracker.q = t.value; clearTimeout(ACT._tq); ACT._tq = setTimeout(() => { const pos = t.selectionStart; renderView(); const n = $("#tq"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }, 250); }
 });
 document.addEventListener("change", (e) => {
@@ -1156,7 +1261,7 @@ document.addEventListener("change", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { if (!$("#ask").hidden) { $("#ask").hidden = true; $("#ask").innerHTML = ""; } else if (!$("#modal").hidden) ACT.closeModal(); }
-  if (e.key === "Enter" && e.target.id === "wsRevise") wsRun("revise");
+  if (e.key === "Enter" && e.target.id === "wsRevise") { if (claudeReady()) wsRun("revise"); else aiCopy(S.ws && S.ws.ai || "claude", "revise"); }
 });
 $("#modal").addEventListener("mousedown", (e) => { if (e.target.id === "modal" && !(S.ws && S.ws.busy)) ACT.closeModal(); });
 

@@ -15,17 +15,48 @@ Find jobs that suit you, get a resume and cover letter tailored to each one, and
 
 ## Quick start
 
-You need **[Node.js](https://nodejs.org/) 18 or newer**. Check with `node --version`. There's nothing to `npm install`.
+### 1. Install Node.js
+
+You need **[Node.js](https://nodejs.org/) 18 or newer**. Download the **LTS** installer from nodejs.org and run it, then open a **new** terminal window and check it worked:
+
+```bash
+node --version
+```
+
+There's nothing else to install (no `npm install` needed).
+
+### 2. Download the project
 
 ```bash
 git clone https://github.com/sudeshna-khanzode/job-tracker.git
 cd job-tracker
-cp .env.example .env        # Windows: copy .env.example .env
-# open .env and add your keys (see below)
+```
+
+### 3. Create your settings file
+
+On **Mac or Linux**:
+
+```bash
+cp .env.example .env
+open -e .env
+```
+
+On **Windows** (Command Prompt):
+
+```bat
+copy .env.example .env
+notepad .env
+```
+
+Add your keys after the `=` signs (see [Getting your keys](#getting-your-keys)), then save and close the file.
+
+### 4. Start it
+
+```bash
 npm start
 ```
 
-Then open **http://localhost:3000** in your browser. To stop the server, press `Ctrl+C` in the terminal.
+Open **http://localhost:3000** in your browser. To stop the server, press `Ctrl+C` in the terminal. Next time, just `cd job-tracker` and run `npm start` again. Your data is kept.
 
 ## Getting your keys
 
@@ -78,6 +109,7 @@ To store data somewhere else, such as a synced folder, set `DATA_DIR` in `.env`.
 
 | Problem | Fix |
 |---|---|
+| `command not found: npm` | Node.js isn't installed, or the terminal was opened before installing it. Install it from nodejs.org, then open a new terminal window. |
 | `Port 3000 is already in use` | Add `PORT=3001` to `.env` and open http://localhost:3001 |
 | "Can't reach the Job Tracker server" | The terminal running `npm start` was closed. Start it again and reload the page. |
 | "The Claude API rejected your API key" | Check `ANTHROPIC_API_KEY` in `.env`, with no quotes or spaces, then restart. |

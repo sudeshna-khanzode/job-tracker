@@ -48,7 +48,7 @@ copy .env.example .env
 notepad .env
 ```
 
-Add your keys after the `=` signs (see [Getting your keys](#getting-your-keys)), then save and close the file.
+Add your keys after the `=` signs (see [Getting your keys](#getting-your-keys-optional)), then save and close the file.
 
 ### 4. Start it
 

@@ -30,6 +30,7 @@ const S = {
   persist: "loading", // loading | ok | none | slow
   profile: { skills: "", notes: "", prefs: { roles: "", location: "", country: "AU", jobType: "" } },
   profileDirty: false,
+  profileMsg: null, // {text, kind} shown beside the Save button
   resumes: new Map(),
   jobs: new Map(),
   loaded: { profile: false, jobs: false, resumes: false },
@@ -213,9 +214,11 @@ function scheduleRender() {
     renderView();
   });
 }
-document.addEventListener("focusout", () => setTimeout(() => {
-  if (S.renderDirty && !isEditing($("#view"))) { S.renderDirty = false; renderView(); }
-}, 0));
+let pointerDown = false;
+const flushRender = () => { if (S.renderDirty && !pointerDown && !isEditing($("#view"))) { S.renderDirty = false; renderView(); } };
+document.addEventListener("pointerdown", () => { pointerDown = true; }, true);
+document.addEventListener("pointerup", () => setTimeout(() => { pointerDown = false; flushRender(); }, 60), true);
+document.addEventListener("focusout", () => setTimeout(flushRender, 0));
 function renderAll() { renderChrome(); renderView(); }
 
 function counts() {
@@ -316,6 +319,17 @@ function viewHome() {
 }
 
 /* ============ PROFILE ============ */
+function profileStatus() {
+  if (S.profileDirty) return `<span class="dot warn"></span>You have unsaved changes`;
+  if (S.profileMsg) return `<span class="dot ok"></span>${esc(S.profileMsg)}`;
+  return `<span class="dot ok"></span>Everything is saved`;
+}
+function refreshSaveBar() {
+  const bar = $("#savebar"), msg = $("#savemsg");
+  if (!bar || !msg) return;
+  bar.classList.toggle("dirty", !!S.profileDirty);
+  msg.innerHTML = profileStatus();
+}
 function viewProfile() {
   const p = S.profile, pr = p.prefs;
   const rs = [...S.resumes.values()].sort((a, b) => a.addedAt - b.addedAt);
@@ -370,9 +384,9 @@ function viewProfile() {
         <label class="f">Job type</label>
         <select data-pf="prefs.jobType">${JOBTYPES.map(([v, n]) => `<option value="${v}" ${pr.jobType === v ? "selected" : ""}>${n}</option>`).join("")}</select>
       </div>
-      <div class="card" style="display:flex;align-items:center;gap:12px">
-        <div style="flex:1" class="small muted">${S.profileDirty ? "You have unsaved changes." : "Profile is up to date."}</div>
-        <button class="btn pri" data-act="saveProfile" ${S.profileDirty ? "" : "disabled"}>Save profile</button>
+      <div class="card savebar ${S.profileDirty ? "dirty" : ""}" id="savebar">
+        <div style="flex:1" class="small" id="savemsg">${profileStatus()}</div>
+        <button class="btn pri" data-act="saveProfile">Save profile</button>
         <a class="btn" href="#find">Find jobs →</a>
       </div>
     </div>
@@ -384,7 +398,8 @@ document.addEventListener("input", (e) => {
   const path = el.dataset.pf.split(".");
   let o = S.profile; for (let i = 0; i < path.length - 1; i++) o = o[path[i]];
   o[path[path.length - 1]] = el.value;
-  if (!S.profileDirty) { S.profileDirty = true; const btn = $('[data-act="saveProfile"]'); if (btn) { btn.disabled = false; btn.parentElement.querySelector(".small").textContent = "You have unsaved changes."; } }
+  S.profileDirty = true; S.profileMsg = null;
+  refreshSaveBar();
 });
 document.addEventListener("change", (e) => {
   const el = e.target;
@@ -424,7 +439,8 @@ async function addResumeFiles(files) {
       const text = tidyText(await extractText(f));
       if (text.length < 200) throw new Error("Couldn't find much text in " + f.name + ". If it's a scanned PDF, paste the text instead.");
       await saveResume({ id: "r-" + now().toString(36) + Math.random().toString(36).slice(2, 6), name: f.name.replace(/\.[^.]+$/, ""), text, addedAt: now() });
-      toast("Added " + f.name);
+      S.profileMsg = `Resume “${f.name.replace(/\.[^.]+$/, "")}” added and saved`; refreshSaveBar();
+      toast("Added and saved " + f.name);
     } catch (e) { toast(e.message || "Couldn't read " + f.name, 6000); }
   }
   if ($("#upmsg")) $("#upmsg").textContent = "";
@@ -1036,7 +1052,13 @@ function exportCsv() {
 
 /* ============ actions ============ */
 const ACT = {
-  saveProfile: () => { saveProfile(); renderView(); toast("Profile saved"); },
+  saveProfile: async () => {
+    const wasDirty = S.profileDirty;
+    S.profileMsg = "Saving…"; S.profileDirty = false; refreshSaveBar();
+    try { await saveProfile(); S.profileMsg = "Saved just now"; toast(wasDirty ? "Profile saved" : "Profile is saved"); }
+    catch { S.profileDirty = true; S.profileMsg = null; toast("Couldn't save. Try again."); }
+    refreshSaveBar();
+  },
   previewResume: (b) => {
     const r = S.resumes.get(b.dataset.id); if (!r) return;
     const m = $("#modal");
@@ -1047,12 +1069,12 @@ const ACT = {
   },
   delResume: (b) => {
     const r = S.resumes.get(b.dataset.id); if (!r) return;
-    ask(`<h3>Delete “${esc(r.name)}”?</h3><p class="muted" style="margin:0">Documents you already generated stay as they are.</p>`, [{ label: "Cancel" }, { label: "Delete", cls: "pri", fn: () => deleteResume(r.id) }]);
+    ask(`<h3>Delete “${esc(r.name)}”?</h3><p class="muted" style="margin:0">Documents you already generated stay as they are.</p>`, [{ label: "Cancel" }, { label: "Delete", cls: "pri", fn: () => { deleteResume(r.id); S.profileMsg = `Resume “${r.name}” deleted`; } }]);
   },
   pasteResume: () => {
     const text = tidyText($("#pasteText").value), name = $("#pasteName").value.trim() || "Pasted resume";
     if (text.length < 200) { toast("That looks too short for a resume. Paste the full text."); return; }
-    saveResume({ id: "r-" + now().toString(36), name, text, addedAt: now() }); toast("Added " + name);
+    saveResume({ id: "r-" + now().toString(36), name, text, addedAt: now() }); S.profileMsg = `Resume “${name}” added and saved`; toast("Added and saved " + name);
   },
   suggestRoles: async (b) => {
     const msg = $("#rolemsg"); b.disabled = true; if (msg) msg.textContent = "Reading your resume…";
@@ -1060,7 +1082,7 @@ const ACT = {
       const out = await S.sample.json(`Suggest 4 to 6 job titles this person should search for on job boards, based on their resume. Use common job-board titles at the right seniority. Reply with only JSON: {"roles":["Title 1","Title 2"]}\n\nRESUME AND NOTES:\n${candidateMaterial("all", 6000).slice(0, 20000)}`, { modelTier: "quick" });
       const roles = (out && Array.isArray(out.roles) ? out.roles : []).map(String).filter(Boolean).slice(0, 6);
       if (!roles.length) throw { code: "invalid_json" };
-      S.profile.prefs.roles = roles.join(", "); S.profileDirty = true; saveProfile(); renderView(); toast("Added suggested job titles");
+      S.profile.prefs.roles = roles.join(", "); S.profileDirty = true; await saveProfile(); S.profileMsg = "Suggested job titles added and saved"; renderView(); toast("Added suggested job titles");
     } catch (e) { if (msg) msg.textContent = sampleErr(e); b.disabled = false; }
   },
   find: () => runFind(),

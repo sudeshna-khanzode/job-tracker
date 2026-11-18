@@ -1,0 +1,13 @@
+# secrets
+.env
+
+# your saved data (resumes, jobs)
+data/
+
+# os / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
+*.log

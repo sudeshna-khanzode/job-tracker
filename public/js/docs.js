@@ -60,7 +60,7 @@
     if (r.contact.length) P({ alignment: D.AlignmentType.CENTER, spacing: { after: 120 }, children: [run(r.contact.join("  |  "), { size: 19, color: "444444" })] });
 
     const section = (title) => P({
-      spacing: { before: 200, after: 80 },
+      spacing: { before: 200, after: 80 }, keepNext: true, keepLines: true,
       border: { bottom: { color: "9AA5B1", space: 2, style: D.BorderStyle.SINGLE, size: 6 } },
       children: [run(title.toUpperCase(), { bold: true, size: 21, color: ACCENT, characterSpacing: 20 })],
     });

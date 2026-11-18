@@ -710,6 +710,7 @@ function aiPanel(W) {
       </div>
       <p class="small muted" style="margin:2px 0 8px">Copies the request and opens the AI in a new tab. Paste it there, then copy the answer back here. Works with free accounts.</p>
       <div class="aibtns">${AIS.map((a) => `<button class="btn sm ${W.ai === a.id && W.paste ? "pri" : ""}" data-act="aiCopy" data-ai="${a.id}">${a.name} ↗</button>`).join("")}</div>
+      ${!W.paste ? `<div class="small" style="margin-top:8px"><a href="#" data-act="aiPasteOnly">Already have an answer? Paste it here</a></div>` : ""}
       ${!claudeReady() ? `<p class="small muted" style="margin:8px 0 0">For one-click tailoring here instead, add an Anthropic API key to <code>.env</code> (paid).</p>` : ""}
     </div>`;
 }
@@ -717,12 +718,12 @@ function pastePanel(W) {
   const n = aiName(W.ai);
   return `
     <div class="pastebox">
-      <p class="step">${W.paste === "revise" ? "Revising" : "Tailoring"} with ${esc(n)}</p>
-      <ol class="small">
+      <p class="step">${W.paste === "revise" ? "Revising" : "Tailoring"}${W.prompt ? " with " + esc(n) : ""}</p>
+      ${!W.prompt ? `<p class="small muted" style="margin:4px 0 10px">Paste the AI's complete answer below, then click <b>Create documents</b>.</p>` : `<ol class="small">
         <li>The request is copied. ${W.copyFailed ? `<b>Your browser blocked copying</b>, so <a href="#" data-act="aiShowPrompt">show the request</a> and copy it yourself.` : `In the ${esc(n)} tab, paste it (Cmd+V / Ctrl+V) and send. <a href="#" data-act="aiCopyAgain">Copy again</a>`}</li>
-        <li>When ${esc(n)} finishes, copy its whole answer (use its copy button).</li>
-        <li>Paste the answer below and click <b>Create documents</b>.</li>
-      </ol>
+        <li>Copy ${esc(n)}'s whole answer (use the copy button under its reply).</li>
+        <li>Wait until ${esc(n)} has <b>finished</b>, then paste its answer below and click <b>Create documents</b>.</li>
+      </ol>`}
       <textarea id="aiAnswer" rows="7" placeholder="Paste ${esc(n)}'s answer here">${esc(W.answer || "")}</textarea>
       ${W.pasteErr ? `<div class="notice bad small" style="margin:8px 0 0">${esc(W.pasteErr)}</div>` : ""}
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -757,12 +758,21 @@ function aiApply() {
   const raw = ($("#aiAnswer") && $("#aiAnswer").value) || W.answer || "";
   W.answer = raw;
   if (!raw.trim()) { W.pasteErr = "Paste the AI's answer first."; renderWs(); return; }
+  if (/=== CANDIDATE MATERIAL ===|You are an expert resume writer/.test(raw)) {
+    W.pasteErr = "That's the request this app copied, not the AI's answer. Paste the request into the AI, wait until it has finished replying, then copy the reply (use the copy button under it) and paste that here.";
+    renderWs(); return;
+  }
   const out = parseJsonLoose(raw);
   if (!out.ok || !out.value || !out.value.resume || !out.value.coverLetter) {
     W.pasteErr = "Couldn't read that answer. Make sure you copied the whole reply (it starts with { and ends with }). If the answer was cut off, ask the AI to “continue”, or click its regenerate button, then copy it again.";
     renderWs(); return;
   }
   const v = out.value, cur = S.jobs.get(W.key); if (!cur) return;
+  const r0 = v.resume || {};
+  if (/^full name$/i.test(String(r0.name || "").trim()) || /^3-4 sentence/i.test(String(r0.summary || "").trim())) {
+    W.pasteErr = "That's the blank example from the request, not a finished resume. Wait for the AI to finish, then copy its whole reply and paste it here.";
+    renderWs(); return;
+  }
   const nj = clone(cur);
   nj.tailored = { resume: v.resume, coverLetter: v.coverLetter, fit: v.fit || {}, at: now(), base: W.base, via: W.ai };
   if (nj.status === "shortlisted") { nj.status = "ready"; nj.history = (nj.history || []).concat([{ s: "ready", at: now() }]); }
@@ -1188,6 +1198,7 @@ const ACT = {
   aiRevise: () => aiCopy((S.ws && S.ws.ai) || "claude", "revise"),
   aiCopyAgain: async () => { const W = S.ws; if (!W || !W.prompt) return; try { await navigator.clipboard.writeText(W.prompt); toast("Copied again"); } catch { W.copyFailed = true; renderWs(); } },
   aiApply: () => aiApply(),
+  aiPasteOnly: () => { const W = S.ws; if (!W) return; W.paste = "new"; W.prompt = ""; W.answer = ""; W.pasteErr = ""; renderWs(); const t = $("#aiAnswer"); if (t) t.focus(); },
   aiCancel: () => { const W = S.ws; if (!W) return; W.paste = null; W.answer = ""; W.pasteErr = ""; renderWs(); },
   aiShowPrompt: () => {
     const W = S.ws; if (!W || !W.prompt) return;

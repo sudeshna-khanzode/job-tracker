@@ -330,12 +330,6 @@ function refreshSaveBar() {
   bar.classList.toggle("dirty", !!S.profileDirty);
   msg.innerHTML = profileStatus();
 }
-function suggestBlock() {
-  if (!S.status) return "Suggestions need the Job Tracker server. Start it with npm start, then reload.";
-  if (!S.status.claude) return "To use suggestions, add ANTHROPIC_API_KEY to your .env file, then restart the server (Ctrl+C, then npm start) and reload this page.";
-  if (!S.resumes.size) return "Add a resume first (on the left), then Claude can suggest job titles from it.";
-  return "";
-}
 function viewProfile() {
   const p = S.profile, pr = p.prefs;
   const rs = [...S.resumes.values()].sort((a, b) => a.addedAt - b.addedAt);
@@ -378,11 +372,10 @@ function viewProfile() {
     <div>
       <div class="card">
         <h2>What jobs to look for</h2>
-        <p class="hint">Used by Find jobs. Separate job titles with commas; each one is searched separately.</p>
-        <label class="f">Job titles to search</label>
-        <div class="row"><input type="text" data-pf="prefs.roles" value="${esc(pr.roles)}" placeholder="e.g. Data Analyst, Business Analyst, Reporting Analyst">
-          <button class="btn sm shrink" data-act="suggestRoles" ${suggestBlock() ? "disabled" : ""}>Suggest from my resume</button></div>
-        <div id="rolemsg" class="small muted" style="margin-top:4px">${suggestBlock()}</div>
+        <p class="hint">Used by Find jobs. Each position is searched separately.</p>
+        <label class="f">Positions you want</label>
+        <input type="text" data-pf="prefs.roles" value="${esc(pr.roles)}" placeholder="e.g. Data Analyst, Business Analyst, Reporting Analyst">
+        <div class="small muted" style="margin-top:4px">Type one or more job titles, separated by commas.</div>
         <div class="row" style="margin-top:2px">
           <div><label class="f">Location</label><input type="text" data-pf="prefs.location" value="${esc(pr.location)}" placeholder="City and state, or remote"></div>
           <div><label class="f">Country</label><select data-pf="prefs.country">${COUNTRIES.map(([c, n]) => `<option value="${c}" ${pr.country === c ? "selected" : ""}>${n}</option>`).join("")}</select></div>
@@ -522,7 +515,7 @@ function viewFind() {
   ${!jobsReady() ? `<div class="notice warn"><b>Job search isn't set up yet.</b> Add your free Adzuna keys to <code>.env</code> and restart the server (steps in the README). Meanwhile you can add jobs by hand on the <a href="#apply">Apply</a> tab.</div>` : ""}
   <div class="card">
     <div class="row">
-      <div style="flex:2"><label class="f">Job titles (comma separated)</label><input type="text" data-pf="prefs.roles" value="${esc(pr.roles)}" placeholder="e.g. Data Analyst, Business Analyst"></div>
+      <div style="flex:2"><label class="f">Positions (comma separated)</label><input type="text" data-pf="prefs.roles" value="${esc(pr.roles)}" placeholder="e.g. Data Analyst, Business Analyst"></div>
       <div><label class="f">Location</label><input type="text" data-pf="prefs.location" value="${esc(pr.location)}" placeholder="City, or remote"></div>
       <div style="max-width:160px"><label class="f">Country</label><select data-pf="prefs.country">${COUNTRIES.map(([c, n]) => `<option value="${c}" ${pr.country === c ? "selected" : ""}>${n}</option>`).join("")}</select></div>
       <div style="max-width:150px"><label class="f">Type</label><select data-pf="prefs.jobType">${JOBTYPES.map(([v, n]) => `<option value="${v}" ${pr.jobType === v ? "selected" : ""}>${n}</option>`).join("")}</select></div>
@@ -570,7 +563,7 @@ async function runFind() {
   const F = S.find, pr = S.profile.prefs;
   if (S.profileDirty) saveProfile();
   const roles = [...new Set(String(pr.roles || "").split(/[,;\n]/).map((s) => s.trim()).filter(Boolean))].slice(0, 6);
-  if (!roles.length) { F.err = "Add at least one job title to search for (or use Suggest from my resume on My profile)."; renderView(); return; }
+  if (!roles.length) { F.err = "Add at least one position to search for (e.g. Data Analyst)."; renderView(); return; }
   if (!pr.location.trim()) { F.err = "Add a location (a city, or 'remote')."; renderView(); return; }
   Object.assign(F, { busy: true, err: "", results: null, selected: new Set(), msg: "Searching job listings…" });
   renderView();
@@ -1081,15 +1074,6 @@ const ACT = {
     const text = tidyText($("#pasteText").value), name = $("#pasteName").value.trim() || "Pasted resume";
     if (text.length < 200) { toast("That looks too short for a resume. Paste the full text."); return; }
     saveResume({ id: "r-" + now().toString(36), name, text, addedAt: now() }); S.profileMsg = `Resume “${name}” added and saved`; toast("Added and saved " + name);
-  },
-  suggestRoles: async (b) => {
-    const msg = $("#rolemsg"); b.disabled = true; if (msg) msg.textContent = "Reading your resume…";
-    try {
-      const out = await S.sample.json(`Suggest 4 to 6 job titles this person should search for on job boards, based on their resume. Use common job-board titles at the right seniority. Reply with only JSON: {"roles":["Title 1","Title 2"]}\n\nRESUME AND NOTES:\n${candidateMaterial("all", 6000).slice(0, 20000)}`, { modelTier: "quick" });
-      const roles = (out && Array.isArray(out.roles) ? out.roles : []).map(String).filter(Boolean).slice(0, 6);
-      if (!roles.length) throw { code: "invalid_json" };
-      S.profile.prefs.roles = roles.join(", "); S.profileDirty = true; await saveProfile(); S.profileMsg = "Suggested job titles added and saved"; renderView(); toast("Added suggested job titles");
-    } catch (e) { if (msg) msg.textContent = sampleErr(e); b.disabled = false; }
   },
   find: () => runFind(),
   selAll: () => { S.find.selected = new Set(S.find.results.map((_, i) => i)); renderView(); },

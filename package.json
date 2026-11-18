@@ -1,0 +1,16 @@
+{
+  "name": "job-tracker",
+  "version": "1.0.0",
+  "description": "Find jobs, tailor your resume and cover letter for each one with Claude, and track every application. Runs locally.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["job search", "resume", "cover letter", "tracker", "claude"],
+  "license": "MIT",
+  "private": true
+}

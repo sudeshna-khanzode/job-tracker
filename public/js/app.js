@@ -330,6 +330,12 @@ function refreshSaveBar() {
   bar.classList.toggle("dirty", !!S.profileDirty);
   msg.innerHTML = profileStatus();
 }
+function suggestBlock() {
+  if (!S.status) return "Suggestions need the Job Tracker server. Start it with npm start, then reload.";
+  if (!S.status.claude) return "To use suggestions, add ANTHROPIC_API_KEY to your .env file, then restart the server (Ctrl+C, then npm start) and reload this page.";
+  if (!S.resumes.size) return "Add a resume first (on the left), then Claude can suggest job titles from it.";
+  return "";
+}
 function viewProfile() {
   const p = S.profile, pr = p.prefs;
   const rs = [...S.resumes.values()].sort((a, b) => a.addedAt - b.addedAt);
@@ -375,8 +381,8 @@ function viewProfile() {
         <p class="hint">Used by Find jobs. Separate job titles with commas; each one is searched separately.</p>
         <label class="f">Job titles to search</label>
         <div class="row"><input type="text" data-pf="prefs.roles" value="${esc(pr.roles)}" placeholder="e.g. Data Analyst, Business Analyst, Reporting Analyst">
-          <button class="btn sm shrink" data-act="suggestRoles" ${claudeReady() && S.resumes.size ? "" : "disabled"}>Suggest from my resume</button></div>
-        <div id="rolemsg" class="small muted" style="margin-top:4px"></div>
+          <button class="btn sm shrink" data-act="suggestRoles" ${suggestBlock() ? "disabled" : ""}>Suggest from my resume</button></div>
+        <div id="rolemsg" class="small muted" style="margin-top:4px">${suggestBlock()}</div>
         <div class="row" style="margin-top:2px">
           <div><label class="f">Location</label><input type="text" data-pf="prefs.location" value="${esc(pr.location)}" placeholder="City and state, or remote"></div>
           <div><label class="f">Country</label><select data-pf="prefs.country">${COUNTRIES.map(([c, n]) => `<option value="${c}" ${pr.country === c ? "selected" : ""}>${n}</option>`).join("")}</select></div>
